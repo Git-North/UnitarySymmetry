@@ -184,7 +184,6 @@ IF /I !MAINMENU!==SCAN ( CALL :clientmodsscan )
 IF /I !MAINMENU!==OVERRIDE ( CALL :override )
 IF /I !MAINMENU!==MCREATOR IF EXIST "%HERE%\mods" ( CALL :mcreatorscan )
 IF /I !MAINMENU!==A GOTO :allcommands
-IF /I !MAINMENU!==ZIP ( CALL :zipit_function )
 IF /I !MAINMENU!==PORT ( CALL :portedit_function )
 IF /I !MAINMENU!==PROPS ( CALL :serverpropsedit_function )
 IF /I !MAINMENU!==FIREWALL ( CALL :firewallcheck )
@@ -193,7 +192,11 @@ IF /I !MAINMENU!==LOG ( CALL :logs_view ) ELSE IF /I !MAINMENU!==LOGS ( CALL :lo
 IF /I !MAINMENU!==MODS ( CALL :mods_view )
 IF /I !MAINMENU!==SMOD ( CALL :mods_view )
 IF /I !MAINMENU!==PURGE ( CALL :purge_function )
-IF /I !MAINMENU!==MRP ( CALL :mrpack )
+IF /I !MAINMENU!==EXPORT ( CALL :export_function )
+IF /I !MAINMENU!==IMPORT ( CALL :import_function )
+IF /I !MAINMENU!==MRPACK ( CALL :mrpack_function )
+
+
 
 :: If no recognized entries were made then go back to main menu
 GOTO :mainmenu
@@ -205,7 +208,7 @@ ECHO:%yellow%
 ECHO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ECHO    Welcome to the Universalator - A modded Minecraft server installer / launcher    
 ECHO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~%blue%
-ECHO: & ECHO: & ECHO:
+ECHO:
 ECHO:    %green% M %blue% = MAIN MENU
 ECHO:    %green% S %blue% = RE-ENTER ALL SETTINGS
 ECHO:    %green% L %blue% = LAUNCH SERVER
@@ -223,8 +226,9 @@ ECHO:    %green% LOG %blue%      = VIEW THE LAST LOG FILE MADE
 ECHO:    %green% MODS/SMOD%blue% = VIEW ALL FILES ^& FOLDERS IN MODS FOLDER
 ECHO:    %green% MCREATOR %blue% = SCAN MOD FILES FOR MCREATOR MADE MODS
 ECHO:    %green% OVERRIDE %blue% = TOGGLE THE JAVA OVERRIDE STATUS
-ECHO:    %green% MRP %blue%      = EXTRACT AN .MRPACK FILE
-ECHO:    %green% ZIP %blue%      = MENU FOR CREATING SERVER PACK ZIP FILE & ECHO: & ECHO: & ECHO:
+ECHO:    %green% IMPORT %blue%   = MENU FOR IMPORTING/DECOMPRESSING THE SERVER
+ECHO:    %green% EXPORT %blue%   = MENU FOR EXPORTING/COMPRESSING THE SERVER
+ECHO:    %green% MRPACK %blue%   = IMPORT AN .mrpack FILE & ECHO:
 :: Instead of yet another entry prompt, goes back to utilize the same main menu prompt and logic.  All-commands menu is really just an alternate main menu display.
 GOTO :allcommandsentry
 
@@ -2548,13 +2552,15 @@ PAUSE
 EXIT /B
 :: END MCREATOR SECTION
 
-::MRPACK EXTRACT
-:mrpack
+
+:: FUNCTION TO - MAKE ZIP SERVERPACK SECTION
+
+:mrpack_function
 :: get the class filecall
 call :java_checks
 cd %~dp0\univ-utils
 Echo Getting mrpack utility .class file
-for /f "delims=" %%A in ('powershell -Command "$url = (Invoke-WebRequest -UseBasicParsing 'https://api.github.com/repos/Git-North/mrpack-installer/releases/latest' | ConvertFrom-Json).assets | Where-Object { $_.browser_download_url -match '.*' } | Select-Object -ExpandProperty browser_download_url; Write-Output $url"') do set "DOWNLOAD_URL=%%A"
+for /f "delims=" %%A in ('powershell -Command "$url = (Invoke-WebRequest -UseBasicParsing 'https://api.github.com/repos/Git-North/mrpack-installer/releases/latest' | ConvertFrom-Json).assets | Where-Object { $_.browser_download_url -match '.*' } | Select-Object -ExpandProperty browser_download_url; Write-Output $url"') do set "DOWNLOAD_URL_MRPACK=%%A"
 curl -L -k "%DOWNLOAD_URL%" -O
 setlocal
 :: Get json.jar
@@ -2562,15 +2568,124 @@ for /f "delims=" %%a in ('powershell -command "(Invoke-WebRequest 'https://repo1
 echo Latest json.jar version: %latest%
 
 curl https://repo1.maven.org/maven2/org/json/json/%latest%/json-%latest%.jar -o json.jar
-"!JAVAFILE!" -cp .;json.jar mrpack-util
+
+"!JAVAFILE!" -cp .;json.jar mrpack_util
+
+exit /b
+
+:export_function
+cls
+ECHO: & ECHO   %yellow% EXPORT SERVER PACK - EXPORT SERVER PACK %blue% & ECHO:
+ECHO   %yellow% Select which export method you want to use, Press m to cancel: %blue% & ECHO:
+ECHO %green% ARC :%blue% & echo - Self-Extracting Archive compiled as a .exe & echo \\ HIGH COMPRESSION - MID-SPEED DECOMPRESSION AND COMPRESSION & echo:
+ECHO %green% 7Z :%blue% & echo - Encrypted Archive & echo - Can be imported via %yellow%Universalator%blue% or External Software & echo - Does not require External Software on an up-to-date Windows 11 version & echo \\ HIGH COMPRESSION - FAST DECOMPRESSION AND COMPRESSION & echo:
+ECHO %green% ZPAQ :%blue% & echo - Archive with versioning abilities & echo - Periodic backups will take even less space & echo - Can be imported via %yellow%Universalator%blue% or External software & echo \\ ULTRA COMPRESSION - SLOW DECOMPRESSION - MID-SPEED COMPRESSION & echo:
+ECHO %green% ZIP :%blue% & echo - Archive that can be opened in practically any device. & echo - Formatted as a "modpack" commonly found in other minecraft server or client software & echo \\ ULTRA-FAST COMPRESSION AND DECOMPRESSION - BAD COMPRESSION & echo:
+
+SET /P EXPMETHOD="%blue%  %green% ENTER AN EXPORT METHOD:%blue%
+
+IF /I !EXPMETHOD!==M ( GOTO :mainmenu )
+IF /I !EXPMETHOD!==ARC ( CALL :Arc )
+IF /I !EXPMETHOD!==7z ( CALL :7z )
+IF /I !EXPMETHOD!==ZPAQ ( CALL :ZpaqFranz )
+IF /I !EXPMETHOD!==ZIP ( CALL :zipit_function )
+
+goto :export_function
+
+:export_prepare
+
+robocopy .\ ".\univ-utils\ziptools\serverfiles" /s /xd univ-utils *cache .mixin.out libraries versions /xf Universalator.bat /move
+xcopy ".\Universalator.bat" ".\univ-utils\ziptools\serverfiles" /y
+cd ".\univ-utils\ziptools\"
+for /f "delims=" %%Z in ('cd') do set "ziptoolsp=%%Z"
+echo !ziptools!
+
+:get_export_utils
+if exist .\algorithms\ (
+  goto :export_util_end
+) else (
+  echo Downloading Zip Utils
+)
+mkdir "%~dp0\univ-utils\ziptools\temp"
+mkdir "%~dp0\univ-utils\ziptools\algorithms\7z"
+mkdir "%~dp0\univ-utils\ziptools\algorithms\arc"
+mkdir "%~dp0\univ-utils\ziptools\algorithms\zpaq"
+
+cd %~dp0\univ-utils\ziptools\temp
+for /f "tokens=*" %%A in ('powershell -Command "$url = Invoke-RestMethod -Uri 'https://api.github.com/repos/peazip/PeaZip/releases/latest'; $url.assets | Where-Object { $_.name -match 'peazip_portable.*WIN64.zip' } | Select-Object -ExpandProperty browser_download_url"') do (
+    curl -L -k "%%A" -o peazip.zip
+)
+
+tar -xzvf peazip.zip
+for /f "tokens=*" %%B in ('powershell -command get-childitem -name -directory') do (cd .\%%B)
+robocopy ./res/bin/7z ../../algorithms/7z /s
+robocopy ./res/bin/arc ../../algorithms/arc /s
+cd %~dp0\univ-utils\ziptools\
+rmdir /s /q .\temp
+cd .\algorithms\zpaq
+
+for /f "tokens=*" %%C in ('powershell -Command "$url = Invoke-RestMethod -Uri 'https://api.github.com/repos/fcorbelli/zpaqfranz/releases/latest'; $url.assets | Where-Object { $_.name -match 'zpaqfranzhw.exe' } | Select-Object -ExpandProperty browser_download_url"') do (
+    curl -L -k "%%C" -O
+)
+cd %~dp0
+
+:export_util_end
+exit /b
+
+:export_finish
+robocopy ".\univ-utils\ziptools\serverfiles" .\ /s /move
+cd %~dp0
+cls
+color 2e
+echo: & echo  %YELLOW% the file is located under univ-utils\ziptools folder %green%
+pause
+color 1e
+echo %blue%
+exit /b
+
+ 
+:Arc
+call :export_prepare
+cls
+"%~dp0\univ-utils\ziptools\algorithms\arc\Arc.exe" a -m9 -s -sfxfreearc.sfx -ae=blowfish "-w!ziptoolsp!" "!ziptoolsp!\Universalated-Server.arc" "-dp!ziptoolsp!" "serverfiles"
+call :export_finish
+exit /b
+
+:7z
+call :export_prepare
+cls
+echo: & echo: & echo  %YELLOW% 7z EXPORT AS ARCHIVE %blue% & echo: & echo:
+echo  SET ENCRYPTION PASSWORD & echo:
+echo  ENCRYPTION OBFUSCATES THE CONTENTS OF YOUR ARCHIVE & echo: & echo:
+echo  You can use the import command inside %yelllow%Universalator%blue% to import your archive automatically.
+echo  You will be asked the password when you try to import your archive if it is set. 
+echo  If the archive is not encrypted importing will continue automatically & echo: & echo:
+echo  %red% Setting an encryption password will require you to use external software or %yellow%Universalator%red% to import the archive %blue% & echo: & echo: & echo: & echo:
+echo %blue%  %green%LEAVE EMPTY FOR NO ENCRYPTION %blue%
+SET /P z7pass="%blue%  %green%ENTER THE ENCRYPTION PASSWORD:%blue%"
+
+if not "%z7pass%"=="" (
+"%~dp0\univ-utils\ziptools\algorithms\7z\7z.exe" a -t7z -m0=FLZMA2 -mmt=on -mx9 -md=64m -mfb=64 -ms=4g -mqs=on -sccUTF-8 -bb0 -bse0 -bsp2 "-w!ziptoolsp!" -snh -snl -ssp -mtc=on -mta=on -p!z7pass! "!ziptoolsp!\Universalated-Server.7z" "!ziptoolsp!\serverfiles"
+) else (
+"%~dp0\univ-utils\ziptools\algorithms\7z\7z.exe" a -t7z -m0=FLZMA2 -mmt=on -mx9 -md=64m -mfb=64 -ms=4g -mqs=on -sccUTF-8 -bb0 -bse0 -bsp2 "-w!ziptoolsp!" -snh -snl -ssp -mtc=on -mta=on "!ziptoolsp!\Universalated-Server.7z" "!ziptoolsp!\serverfiles"
+)
+set z7pass=
+call :export_finish
+exit /b
+
+:ZpaqFranz
+call :export_prepare
+cls
+"%~dp0\univ-utils\ziptools\algorithms\zpaq\zpaqfranzhw.exe" -blake3 -filelist -method 4 a "!ziptoolsp!\Universalated-Server.zpaq" "!ziptoolsp!\serverfiles"
+call :export_finish
 exit /b
 
 
-:: FUNCTION TO - MAKE ZIP SERVERPACK SECTION
+
 :zipit_function
 :zipit
 CLS
-ECHO: & ECHO   %yellow% ZIP SERVER PACK - ZIP SERVER PACK %blue% & ECHO:
+ECHO: & ECHO   %yellow% EXPORT SERVER PACK - EXPORT SERVER PACK %blue% & ECHO:
 ECHO     Continue on to create a server pack ZIP file? & ECHO:
 ECHO     Server packs are typically made by modpack authors wishing to share the files & ECHO     needed to correctly run a server for their modpack. & ECHO:
 ECHO          %green% - Include all required files and folders in the following menu. %blue% & ECHO:
@@ -2678,6 +2793,22 @@ IF /I "!ASKUPNPDOWNLOAD:~0,6!"=="ZIPIT " (
 GOTO :zipit2
 :: END ZIP SERVERPACK SECTION
 
+:import_function
+call :get_export_utils
+cls
+for %%i in (Universalated-Server.*) do set import_extension=%%~xi
+echo %import_extension%
+if %import_extension%==.7z (%~dp0\univ-utils\ziptools\algorithms\7z\7z.exe x Universalated-Server*.7z -o* & goto import_function_end)
+if %import_extension%==.zpaq (%~dp0\univ-utils\ziptools\algorithms\zpaq\zpaqfranzhw.exe e Universalated-Server*.zpaq -longpath & goto import_function_end)
+if %import_extension%==.exe (start "" *.exe /wait & goto :import_function_end)
+%~dp0\univ-utils\ziptools\algorithms\7z\7z.exe x *.zip -o* & goto :import_function_end
+:import_function_end
+color 2e
+cls
+echo: & echo  %YELLOW% the archive has been successfully extracted %green%
+pause
+color 1e
+exit /b
 
 :: BEGIN LOGS SCANNING SECTION
 :logsscan
