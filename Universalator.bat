@@ -3963,20 +3963,104 @@ EXIT /B
 :: FUNCTIONS TO VIEW LAST LOG FILE / MODS
 :logs_view
 CLS
+@ECHO OFF
+CLS
+
+:: Immediately jump to the menu to ensure it's the first thing displayed
+GOTO :start_menu
+
+:: --- Define the menu and choice handling ---
+:start_menu
+ECHO: & ECHO:
+ECHO   =========================================
+ECHO             Log Viewer Options
+ECHO   =========================================
+ECHO:
+ECHO   [1] View Log File Locally
+ECHO   [2] Upload Log File to mclo.gs
+ECHO   [Q] Quit
+ECHO:
+ECHO   =========================================
+SET /P "choice=   Enter your choice (1, 2, or Q): "
+
+IF /I "%choice%"=="1" GOTO :original_script
+IF /I "%choice%"=="2" GOTO :improved_script
+IF /I "%choice%"=="Q" GOTO :eof
+GOTO :invalid_choice
+
+:invalid_choice
+ECHO: & ECHO   Invalid choice. Please enter 1, 2, or Q.
+PAUSE
+GOTO :start_menu
+
+:: --- Original Script Logic ---
+:original_script
+CLS
+ECHO: & ECHO   You chose: View Log File Locally.
+ECHO:
+
 IF NOT EXIST "logs\latest.log" (
   ECHO: & ECHO:
-  ECHO   %yellow% No log file was found in the 'logs' folder^^! %blue% & ECHO:
-  ECHO   %yellow% If you have not run a server yet, then there will be no log file. %blue% & ECHO:
-  ECHO   %yellow% If you have run a server and this file is missing, then it may have been deleted. %blue% & ECHO:
+  ECHO   No log file was found in the 'logs' folder! & ECHO:
+  ECHO   If you have not run a server yet, then there will be no log file. & ECHO:
+  ECHO   If you have run a server and this file is missing, then it may have been deleted. & ECHO:
   PAUSE
-  EXIT /B
+  GOTO :eof
 )
 ECHO: & ECHO:
 TYPE "logs\latest.log"
 CALL :logsscan
 ECHO: & ECHO:
 PAUSE
-EXIT /B
+GOTO :eof
+
+:: --- Improved Script Logic ---
+:improved_script
+CLS
+ECHO: & ECHO   You chose: Upload Log File to mclo.gs.
+ECHO:
+
+:: Check if the log file exists
+IF NOT EXIST "logs\latest.log" (
+  ECHO: & ECHO:
+  ECHO   No log file was found in the 'logs' folder! & ECHO:
+  ECHO   If you have not run a server yet, then there will be no log file. & ECHO:
+  ECHO   If you have run a server and this file is missing, then it may have been deleted. & ECHO:
+  PAUSE
+  GOTO :eof
+)
+
+ECHO: & ECHO:
+ECHO   Attempting to upload 'latest.log' to mclo.gs...
+ECHO:
+
+:: Use PowerShell to upload the log and capture the response
+powershell -Command "try { $response = Invoke-RestMethod -Uri 'https://api.mclo.gs/1/log' -Method Post -Body @{content = Get-Content -Path 'logs\latest.log' -Raw}; Write-Host ' ' -NoNewline; Write-Host $response.url } catch { Write-Host ' ' -NoNewline; Write-Host 'Upload failed. Error: ' -ForegroundColor Red -NoNewline; Write-Host $_.Exception.Message -ForegroundColor Red }" > temp_url.txt
+
+:: Read the URL from the temporary file
+set /p "URL=" < temp_url.txt
+del temp_url.txt
+
+:: Display the result
+IF NOT "x%URL%x"=="xx" (
+  ECHO   Success! Your log has been uploaded.
+  ECHO:
+  ECHO   URL: %cyan%%URL%%reset%%blue%
+) ELSE (
+  ECHO   Failed to get URL. The upload may have failed.
+)
+
+ECHO: & ECHO:
+PAUSE
+GOTO :eof
+
+:: End of script.
+:: Remember to define your :logsscan subroutine here if you use it in the original script path.
+:: Example:
+:: :logsscan
+:: ECHO Running log scan...
+:: REM Your custom log scanning logic goes here
+:: EXIT /B
 
 :mods_view
 DIR /B "mods\*.jar" 2>nul | FINDSTR "." >nul && (
