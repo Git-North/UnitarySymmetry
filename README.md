@@ -11,3 +11,4 @@ It also has some misc improvements like:
 - Support for command-line arguments (Better Automation)
 - Server Launches in 25 seconds after going to the "Launch Server" screen (Better Automation)
 - mrpack extraction support
+- [mclo.gs](https://mclo.gs/) upload support
