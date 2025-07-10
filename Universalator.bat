@@ -1050,33 +1050,28 @@ FOR /F "delims=" %%A IN ('powershell -Command "$ver='!JAVAVERSION!'; $MonthsAgo 
 )
 :skipsystemjavacheck
 
-ECHO: & ECHO   Searching for Universalator installed Java from Adoptium ... ..
-%DELAY%
-SET A_MONTHS=6
+IF NOT EXIST "%HERE%\univ-utils\java" MD "%HERE%\univ-utils\java"
+ver >nul
+ECHO: & ECHO:
 
-FOR /F "delims=" %%A IN ('DIR /B univ-utils\java') DO (
-  ECHO "%%A" | FINDSTR "!FINDFOLDER!" >nul
-  IF !ERRORLEVEL!==0 (
+FOR /F "delims=" %%A IN ('DIR /B %~dp0\univ-utils\java') DO (
     SET "JAVAFOLDER=%%A"
-    ECHO: & ECHO      - Found existing Java !JAVAVERSION! folder - %%A
-    %DELAY%
-    :: Runs a FOR loop with a powershell command to check the age of the found java folder.  If it's older than A_MONTHS months result is 'True'.  If it's newer than 3 months result is 'False'.
-    REM FOR /F %%G IN ('powershell -Command "Test-Path '!HEREPOWERSHELL!\univ-utils\java\%%A' -OlderThan (Get-Date).AddMonths(-2.5)"') DO (
-    FOR /F %%G IN ('powershell -Command "$path='!HEREPOWERSHELL!\univ-utils\java\%%A\bin\java.exe'; (Test-Path $path) -and ((Get-Item $path).LastWriteTime -lt (Get-Date).AddMonths(-!A_MONTHS!))"') DO (
+    ECHO   Found existing Java !JAVAVERSION! folder - %%A & ECHO:
+    ping -n 1 127.0.0.1 >nul
+    :: Runs a FOR loop with a powershell command to check the age of the found java folder.  If it's older than 3 months result is 'True'.  If it's newer than 3 months result is 'False'.
+    FOR /F %%G IN ('powershell -Command "Test-Path '%HEREPOWERSHELL%\univ-utils\java\' -OlderThan (Get-Date).AddMonths(-2.5)"') DO (
       :: If False then that means the folder is newer than 3 months - go ahead and use that folder for java, then move on!
       IF %%G==False (
-        ECHO: & ECHO      - Java folder is Newer than !A_MONTHS! months - using this version^^!
-        %DELAY%
         SET "JAVAFILE=%HERE%\univ-utils\java\%%A\bin\java.exe"
-        GOTO :javafileisset
+        GOTO javafileisset
       )
-      :: If True that means that it is older than the months old and is marked as OLD and folder value stored for testing vs the current published release later.
+      :: If True that means that it is older than 2.5 months old and is marked as OLD and folder value stored for testing vs the current published release later.
       IF %%G==True (
-        ECHO: & ECHO      - Java folder is older than !A_MONTHS! months - checking for newer available versions for Java !JAVAVERSION!
-        %DELAY%
+        ECHO   Java folder is older than 3 months - checking for newer available versions for Java !JAVAVERSION! & ECHO:
+        ping -n 1 127.0.0.1 >nul
         SET FOUNDJAVA=OLD
-        GOTO :javaold
-      )
+
+        GOTO javaold
     )
   )
 )
